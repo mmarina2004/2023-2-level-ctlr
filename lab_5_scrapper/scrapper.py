@@ -9,6 +9,7 @@ import requests
 from typing import Pattern, Union
 from core_utils.config_dto import ConfigDTO
 from bs4 import BeautifulSoup
+from core_utils.article.article import Article
 
 
 class IncorrectSeedURLError(Exception):
@@ -315,16 +316,16 @@ class HTMLParser:
         """
 
 
-    def unify_date_format(self, date_str: str) -> datetime.datetime:
-        """
-        Unify date format.
-
-        Args:
-            date_str (str): Date in text format
-
-        Returns:
-            datetime.datetime: Datetime object
-        """
+    #def unify_date_format(self, date_str: str) -> datetime.datetime:
+        #"""
+        # Unify date format.
+        #
+        # Args:
+        #     date_str (str): Date in text format
+        #
+        # Returns:
+        #     datetime.datetime: Datetime object
+        # """
 
     def parse(self) -> Union[Article, bool, list]:
         """
@@ -351,9 +352,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    #main()
-
-    response = requests.get(
-        url="https://www.mk.ru/science/technology/"
-    )
-    print(response.status.code)
+    main()
