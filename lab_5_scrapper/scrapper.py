@@ -222,7 +222,6 @@ class Crawler:
         """
         self.config = config
         self.urls = []
-        self.url_pattern = ''
 
     def _extract_url(self, article_bs: BeautifulSoup) -> str:
         """
@@ -234,11 +233,12 @@ class Crawler:
         Returns:
             str: Url from HTML
         """
-        url = ''
-        link_tags = article_bs.find_all('a')
-        for tag in link_tags:
-            url = tag.get('href')
-        return self.url_pattern + url
+        link_tags = article_bs.find_all('a', class_='listing-preview__content')
+        for link in link_tags:
+            url = link.get('href')
+            if url:
+                return url
+            return ''
 
     def find_articles(self) -> None:
         """
