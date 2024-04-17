@@ -7,11 +7,11 @@ import json
 import re
 import requests
 from typing import Pattern, Union
+from time import sleep
 from core_utils.config_dto import ConfigDTO
 from bs4 import BeautifulSoup
 from core_utils.article.article import Article
 from random import randrange
-from time import sleep
 from core_utils.constants import CRAWLER_CONFIG_PATH, ASSETS_PATH
 from core_utils.article.io import to_raw
 
