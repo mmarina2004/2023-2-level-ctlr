@@ -2,18 +2,18 @@
 Crawler implementation.
 """
 # pylint: disable=too-many-arguments, too-many-instance-attributes, unused-import, undefined-variable
-import pathlib
 import json
+import pathlib
 import re
 import requests
-from typing import Pattern, Union
-from time import sleep
-from core_utils.config_dto import ConfigDTO
 from bs4 import BeautifulSoup
 from core_utils.article.article import Article
-from random import randrange
-from core_utils.constants import CRAWLER_CONFIG_PATH, ASSETS_PATH
 from core_utils.article.io import to_raw
+from core_utils.config_dto import ConfigDTO
+from core_utils.constants import CRAWLER_CONFIG_PATH, ASSETS_PATH
+from random import randrange
+from time import sleep
+from typing import Pattern, Union
 
 
 class IncorrectSeedURLError(Exception):
@@ -91,15 +91,7 @@ class Config:
         """
         with open(self.path_to_config, 'r', encoding='utf-8') as file:
             config = json.load(file)
-        return ConfigDTO(
-            seed_urls=config["seed_urls"],
-            total_articles_to_find_and_parse=config["total_articles_to_find_and_parse"],
-            headers=config["headers"],
-            encoding=config["encoding"],
-            timeout=config["timeout"],
-            should_verify_certificate=config["should_verify_certificate"],
-            headless_mode=config["headless_mode"]
-        )
+        return ConfigDTO(**config)
 
     def _validate_config_content(self) -> None:
         """
