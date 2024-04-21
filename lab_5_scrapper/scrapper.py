@@ -236,12 +236,14 @@ class Crawler:
         Returns:
             str: Url from HTML
         """
-        link_tags = article_bs.find_all('a', class_='listing-preview__content')
-        for link in link_tags:
-            url = link.get('href')
-            if url:
-                return url
-            return ''
+        links = article_bs.find_all('a', class_='listing-preview__content')
+        url = ''
+        for link in links:
+            url = self.url_pattern + link['href']
+            if url and url not in self.urls:
+                break
+
+        return url
 
     def find_articles(self) -> None:
         """
