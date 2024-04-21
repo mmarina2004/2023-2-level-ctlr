@@ -239,10 +239,7 @@ class Crawler:
         links = article_bs.find_all('a', class_='listing-preview__content')
         url = ''
         for link in links:
-            url = self.url_pattern + link['href']
-            if url and url not in self.urls:
-                break
-
+            url = link['href']
         return url
 
     def find_articles(self) -> None:
