@@ -2,18 +2,21 @@
 Crawler implementation.
 """
 # pylint: disable=too-many-arguments, too-many-instance-attributes, unused-import, undefined-variable
+import datetime
 import json
 import pathlib
 import re
-import requests
-from bs4 import BeautifulSoup
-from core_utils.article.article import Article
-from core_utils.article.io import to_raw
-from core_utils.config_dto import ConfigDTO
-from core_utils.constants import CRAWLER_CONFIG_PATH, ASSETS_PATH
 from random import randrange
 from time import sleep
 from typing import Pattern, Union
+
+import requests
+from bs4 import BeautifulSoup
+
+from core_utils.article.article import Article
+from core_utils.article.io import to_raw
+from core_utils.config_dto import ConfigDTO
+from core_utils.constants import ASSETS_PATH, CRAWLER_CONFIG_PATH
 
 
 class IncorrectSeedURLError(Exception):
@@ -304,7 +307,6 @@ class HTMLParser:
             article += paragraph.text
         self.article.text = article
 
-
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
         Find meta information of article.
@@ -319,17 +321,25 @@ class HTMLParser:
             self.article.author = ["NOT FOUND"]
         self.article.title = article_soup.find(itemprop="headline").text.strip()
 
+        article_date = article_soup.find('time', class_='meta__text').text
+        formatted_date = ''.join(article_date.split(' в '))
+        self.article.date = self.unify_date_format(formatted_date)
 
-    #def unify_date_format(self, date_str: str) -> datetime.datetime:
-        #"""
-        # Unify date format.
-        #
-        # Args:
-        #     date_str (str): Date in text format
-        #
-        # Returns:
-        #     datetime.datetime: Datetime object
-        # """
+        tags = article_soup.find_all('a', class_='article__tag-item')
+        for tag in tags:
+            self.article.topics.append(tag.text)
+
+    def unify_date_format(self, date_str: str) -> datetime.datetime:
+        """
+         Unify date format.
+
+         Args:
+             date_str (str): Date in text format
+
+         Returns:
+             datetime.datetime: Datetime object
+         """
+        return datetime.datetime.strptime(date_str, "%d.%m.%Y %H:%M")
 
     def parse(self) -> Union[Article, bool, list]:
         """
