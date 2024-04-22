@@ -313,9 +313,9 @@ class HTMLParser:
         Args:
             article_soup (bs4.BeautifulSoup): BeautifulSoup instance
         """
-        author = article_soup.find("li", itemprop="author").text.strip()
-        if isinstance(author, str) and author:
-            self.article.author = [author]
+        author = article_soup.find("li", itemprop="author")
+        if author:
+            self.article.author = [author.text.strip()]
         else:
             self.article.author = ["NOT FOUND"]
         self.article.title = article_soup.find(itemprop="headline").text.strip()
@@ -364,9 +364,9 @@ def prepare_environment(base_path: Union[pathlib.Path, str]) -> None:
         base_path (Union[pathlib.Path, str]): Path where articles stores
     """
     if not base_path.exists():
-        base_path.mkdir()
+        base_path.mkdir(parents=True)
     base_path.rmdir()
-    base_path.mkdir()
+    base_path.mkdir(parents=True)
 
 
 def main() -> None:
