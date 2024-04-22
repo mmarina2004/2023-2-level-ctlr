@@ -313,16 +313,21 @@ class HTMLParser:
         Args:
             article_soup (bs4.BeautifulSoup): BeautifulSoup instance
         """
-        author = article_soup.find("li", itemprop="author")
+        author = article_soup.find('a', class_="article__author-text-link")
         if author:
             self.article.author = [author.text.strip()]
         else:
             self.article.author = ["NOT FOUND"]
-        self.article.title = article_soup.find(itemprop="headline").text.strip()
 
-        article_date = article_soup.find('time', class_='meta__text').text
-        formatted_date = ''.join(article_date.split(' в '))
-        self.article.date = self.unify_date_format(formatted_date)
+        title = article_soup.find(itemprop="headline")
+        if title:
+            self.article.title = title.text.strip()
+
+        date = article_soup.find('time', class_='meta__text')
+        if date:
+            article_date = date.text
+            formatted_date = ''.join(article_date.split(' в '))
+            self.article.date = self.unify_date_format(formatted_date)
 
         tags = article_soup.find_all('a', class_='article__tag-item')
         for tag in tags:
