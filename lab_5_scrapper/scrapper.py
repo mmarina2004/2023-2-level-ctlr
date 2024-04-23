@@ -6,6 +6,7 @@ import datetime
 import json
 import pathlib
 import re
+import shutil
 from random import randrange
 from time import sleep
 from typing import Pattern, Union
@@ -14,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from core_utils.article.article import Article
-from core_utils.article.io import to_raw
+from core_utils.article.io import to_meta, to_raw
 from core_utils.config_dto import ConfigDTO
 from core_utils.constants import ASSETS_PATH, CRAWLER_CONFIG_PATH
 
@@ -104,7 +105,7 @@ class Config:
             raise IncorrectSeedURLError("Seed URL does not match standard pattern 'https?://(www.)?'")
 
         for seed_url in self.config.seed_urls:
-            if not re.match(r"https?://(www.)?", seed_url):
+            if not re.match(r"https?://(www.)mk\.ru/science/technology/", seed_url):
                 raise IncorrectSeedURLError("Seed URL does not match standard pattern 'https?://(www.)?'")
 
         if not isinstance(self.config.total_articles, int) or self.config.total_articles <= 0:
@@ -246,16 +247,18 @@ class Crawler:
         """
         Find articles.
         """
-        for url in self.get_search_urls():
-            response = make_request(url, self.config)
-            if not response.ok:
-                continue
+        urls = []
+        while len(urls) < self.config.get_num_articles():
+            for url in self.get_search_urls():
+                response = make_request(url, self.config)
 
-            article_bs = BeautifulSoup(response.text, "lxml")
-            for i in range(30):
-                extracted_url = self._extract_url(article_bs)
-                if extracted_url:
-                    self.urls.append(extracted_url)
+                if not response.ok:
+                    continue
+
+                soup = BeautifulSoup(response.text, 'lxml')
+                urls.append(self._extract_url(soup))
+
+        self.urls.extend(urls)
 
     def get_search_urls(self) -> list:
         """
@@ -368,9 +371,8 @@ def prepare_environment(base_path: Union[pathlib.Path, str]) -> None:
     Args:
         base_path (Union[pathlib.Path, str]): Path where articles stores
     """
-    if not base_path.exists():
-        base_path.mkdir(parents=True)
-    base_path.rmdir()
+    if base_path.exists():
+        shutil.rmtree(base_path)
     base_path.mkdir(parents=True)
 
 
@@ -383,11 +385,12 @@ def main() -> None:
     crawler.find_articles()
     prepare_environment(ASSETS_PATH)
 
-    for index, url in enumerate(crawler.get_search_urls()):
+    for index, url in enumerate(crawler.urls, 1):
         parser = HTMLParser(url, index, config)
         article = parser.parse()
         if isinstance(article, Article):
             to_raw(article)
+            to_meta(article)
 
 
 if __name__ == "__main__":
