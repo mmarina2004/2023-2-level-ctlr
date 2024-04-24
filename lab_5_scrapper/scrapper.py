@@ -202,7 +202,7 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     Returns:
         requests.models.Response: A response from a request
     """
-    sleep(randrange(5))
+    sleep(randrange(2))
     return requests.get(
         url=url,
         timeout=config.get_timeout(),
@@ -302,12 +302,12 @@ class HTMLParser:
         """
         text = article_soup.find_all(itemprop="articleBody")
         description = article_soup.find(itemprop="description")
-        article = ''
+        article = []
         if description:
-            article += description.text
+            article.append(description.text)
         for paragraph in text:
-            article += paragraph.text
-        self.article.text = article
+            article.append(paragraph.text)
+        self.article.text = ''.join(article)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
