@@ -244,8 +244,7 @@ class Crawler:
         """
         Find articles.
         """
-        urls = []
-        while len(urls) < self.config.get_num_articles():
+        while len(self.urls) < self.config.get_num_articles():
             for url in self.get_search_urls():
                 response = make_request(url, self.config)
 
@@ -253,8 +252,8 @@ class Crawler:
                     continue
 
                 soup = BeautifulSoup(response.text, 'lxml')
-                urls.append(self._extract_url(soup))
-            self.urls.extend(urls)
+                if url and url not in self.urls:
+                    self.urls.append(self._extract_url(soup))
 
     def get_search_urls(self) -> list:
         """
@@ -434,10 +433,11 @@ def main() -> None:
 
     for article_id, url in enumerate(crawler.urls, 1):
         parser = HTMLParser(url, article_id, config)
-        article = parser.parse()
+        article = parser.parse
         if isinstance(article, Article):
             to_raw(article)
             to_meta(article)
+
 
 def recursive_main() -> None:
     config = Config(CRAWLER_CONFIG_PATH)
@@ -447,7 +447,7 @@ def recursive_main() -> None:
 
     for article_id, url in enumerate(crawler.urls, 1):
         parser = HTMLParser(url, article_id, config)
-        article = parser.parse()
+        article = parser.parse
         if isinstance(article, Article):
             to_raw(article)
             to_meta(article)
