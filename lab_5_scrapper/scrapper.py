@@ -238,7 +238,7 @@ class Crawler:
             str: Url from HTML
         """
         link = article_bs.find('a', class_='listing-preview__content')
-        return link['href']
+        return str(link.get('href'))
 
     def find_articles(self) -> None:
         """
