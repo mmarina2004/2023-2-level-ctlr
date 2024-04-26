@@ -102,7 +102,7 @@ class Config:
         Ensure configuration parameters are not corrupt.
         """
         if not isinstance(self.config.seed_urls, list):
-            raise IncorrectSeedURLError("Seed URL does not match standard pattern 'https?://(www.)?'")
+            raise IncorrectSeedURLError("Seed URL are not a list'")
 
         for seed_url in self.config.seed_urls:
             if not re.match(r"https?://(www.)mk\.ru/science/technology/", seed_url):
@@ -237,11 +237,8 @@ class Crawler:
         Returns:
             str: Url from HTML
         """
-        links = article_bs.find_all('a', class_='listing-preview__content')
-        url = ''
-        for link in links:
-            url = link['href']
-        return url
+        link = article_bs.find('a', class_='listing-preview__content')
+        return link['href']
 
     def find_articles(self) -> None:
         """
@@ -257,8 +254,7 @@ class Crawler:
 
                 soup = BeautifulSoup(response.text, 'lxml')
                 urls.append(self._extract_url(soup))
-
-        self.urls.extend(urls)
+            self.urls.extend(urls)
 
     def get_search_urls(self) -> list:
         """
@@ -272,6 +268,57 @@ class Crawler:
 
 # 10
 # 4, 6, 8, 10
+
+
+class CrawlerRecursive(Crawler):
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
+        self.base_url = self.config.get_seed_urls()[0]
+        self.visited_urls = [self.base_url]
+        self.page_url = self.base_url
+        self.urls = []
+
+    def get_info(self) -> None:
+        if (ASSETS_PATH.parent / 'recursive_crawler.json').exists():
+            print('yes')
+            with open(ASSETS_PATH.parent / 'recursive_crawler.json', 'r', encoding='utf-8') as infile:
+                data = json.load(infile)
+
+            self.visited_urls = data['visited_urls']
+            self.page_url = data['page_url']
+            self.urls = data['article_urls']
+
+    def save_info(self) -> None:
+        data = {
+            'visited_urls': self.visited_urls,
+            'page_url': self.page_url,
+            'article_urls': self.urls
+        }
+        with open(ASSETS_PATH.parent / 'recursive_crawler.json', 'w',
+                  encoding='utf-8') as file:
+            json.dump(data, file, indent=4)
+
+    def find_articles(self) -> None:
+        for item in range(4):
+            url = self.page_url
+            response = make_request(url, self.config)
+            if not response.ok:
+                continue
+            article_bs = BeautifulSoup(response.content, "html.parser")
+            links = article_bs.find_all('a', class_='listing-preview__content')
+            urls = []
+            for link in links:
+                urls.append(link['href'])
+            for url in urls:
+                if len(self.urls) == self.config.get_num_articles():
+                    self.save_info()
+                    return
+                elif str(url).startswith('/science/technology/') and url not in self.visited_urls:
+                    self.page_url = f'https://www.mk.ru{url}'
+                elif url not in self.visited_urls:
+                    self.visited_urls.append(url)
+                    self.urls.append(url)
+        self.find_articles()
 
 
 class HTMLParser:
@@ -329,7 +376,7 @@ class HTMLParser:
         date = article_soup.find('time', class_='meta__text')
         if date:
             article_date = date.text
-            formatted_date = ''.join(article_date.split(' в '))
+            formatted_date = article_date.replace(' в ', '')
             self.article.date = self.unify_date_format(formatted_date)
 
         tags = article_soup.find_all('a', class_='article__tag-item')
@@ -338,14 +385,14 @@ class HTMLParser:
 
     def unify_date_format(self, date_str: str) -> datetime.datetime:
         """
-         Unify date format.
+        Unify date format.
 
-         Args:
-             date_str (str): Date in text format
+        Args:
+            date_str (str): Date in text format
 
-         Returns:
-             datetime.datetime: Datetime object
-         """
+        Returns:
+            datetime.datetime: Datetime object
+        """
         return datetime.datetime.strptime(date_str, "%d.%m.%Y %H:%M")
 
     def parse(self) -> Union[Article, bool, list]:
@@ -381,12 +428,25 @@ def main() -> None:
     Entrypoint for scrapper module.
     """
     config = Config(CRAWLER_CONFIG_PATH)
+    prepare_environment(ASSETS_PATH)
     crawler = Crawler(config)
     crawler.find_articles()
-    prepare_environment(ASSETS_PATH)
 
-    for index, url in enumerate(crawler.urls, 1):
-        parser = HTMLParser(url, index, config)
+    for article_id, url in enumerate(crawler.urls, 1):
+        parser = HTMLParser(url, article_id, config)
+        article = parser.parse()
+        if isinstance(article, Article):
+            to_raw(article)
+            to_meta(article)
+
+def recursive_main() -> None:
+    config = Config(CRAWLER_CONFIG_PATH)
+    prepare_environment(ASSETS_PATH)
+    crawler = CrawlerRecursive(config)
+    crawler.find_articles()
+
+    for article_id, url in enumerate(crawler.urls, 1):
+        parser = HTMLParser(url, article_id, config)
         article = parser.parse()
         if isinstance(article, Article):
             to_raw(article)
@@ -394,4 +454,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+    recursive_main()
