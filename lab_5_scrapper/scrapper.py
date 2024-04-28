@@ -254,8 +254,9 @@ class Crawler:
                 if len(self.urls) == self.config.get_num_articles():
                     break
 
-                if self._extract_url(article_url) not in self.urls:
-                    self.urls.append(self._extract_url(article_url))
+                url = self._extract_url(article_url)
+                if url and url not in self.urls:
+                    self.urls.append(url)
 
     def get_search_urls(self) -> list:
         """
