@@ -106,7 +106,7 @@ class Config:
 
         for seed_url in self.config.seed_urls:
             if not re.match(r"https?://(www.)mk\.ru/science/technology/", seed_url):
-                raise IncorrectSeedURLError("Seed URL does not match standard pattern 'https?://(www.)?'")
+                raise IncorrectSeedURLError("Seed URL does not match pattern 'https://www.mk.ru/science/technology/'")
 
         if not isinstance(self.config.total_articles, int) or self.config.total_articles <= 0:
             raise IncorrectNumberOfArticlesError("Total number of articles to parse is not an integer")
@@ -202,7 +202,7 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     Returns:
         requests.models.Response: A response from a request
     """
-    sleep(randrange(2))
+    sleep(randrange(5))
     return requests.get(
         url=url,
         timeout=config.get_timeout(),
@@ -237,23 +237,25 @@ class Crawler:
         Returns:
             str: Url from HTML
         """
-        link = article_bs.find('a', class_='listing-preview__content')
-        return str(link.get('href'))
+        return str(article_bs.get('href'))
 
     def find_articles(self) -> None:
         """
         Find articles.
         """
-        while len(self.urls) < self.config.get_num_articles():
-            for url in self.get_search_urls():
-                response = make_request(url, self.config)
+        for url in self.get_search_urls():
+            response = make_request(url, self.config)
 
-                if not response.ok:
-                    continue
+            if not response.ok:
+                continue
 
-                soup = BeautifulSoup(response.text, 'lxml')
-                if url and url not in self.urls:
-                    self.urls.append(self._extract_url(soup))
+            article_bs = BeautifulSoup(response.text, 'lxml')
+            for article_url in article_bs.find_all('a', class_='listing-preview__content'):
+                if len(self.urls) == self.config.get_num_articles():
+                    break
+
+                if self._extract_url(article_url) not in self.urls:
+                    self.urls.append(self._extract_url(article_url))
 
     def get_search_urls(self) -> list:
         """
@@ -267,57 +269,6 @@ class Crawler:
 
 # 10
 # 4, 6, 8, 10
-
-
-class CrawlerRecursive(Crawler):
-    def __init__(self, config: Config) -> None:
-        super().__init__(config)
-        self.base_url = self.config.get_seed_urls()[0]
-        self.visited_urls = [self.base_url]
-        self.page_url = self.base_url
-        self.urls = []
-
-    def get_info(self) -> None:
-        if (ASSETS_PATH.parent / 'recursive_crawler.json').exists():
-            print('yes')
-            with open(ASSETS_PATH.parent / 'recursive_crawler.json', 'r', encoding='utf-8') as infile:
-                data = json.load(infile)
-
-            self.visited_urls = data['visited_urls']
-            self.page_url = data['page_url']
-            self.urls = data['article_urls']
-
-    def save_info(self) -> None:
-        data = {
-            'visited_urls': self.visited_urls,
-            'page_url': self.page_url,
-            'article_urls': self.urls
-        }
-        with open(ASSETS_PATH.parent / 'recursive_crawler.json', 'w',
-                  encoding='utf-8') as file:
-            json.dump(data, file, indent=4)
-
-    def find_articles(self) -> None:
-        for item in range(4):
-            url = self.page_url
-            response = make_request(url, self.config)
-            if not response.ok:
-                continue
-            article_bs = BeautifulSoup(response.content, "html.parser")
-            links = article_bs.find_all('a', class_='listing-preview__content')
-            urls = []
-            for link in links:
-                urls.append(link['href'])
-            for url in urls:
-                if len(self.urls) == self.config.get_num_articles():
-                    self.save_info()
-                    return
-                elif str(url).startswith('/science/technology/') and url not in self.visited_urls:
-                    self.page_url = f'https://www.mk.ru{url}'
-                elif url not in self.visited_urls:
-                    self.visited_urls.append(url)
-                    self.urls.append(url)
-        self.find_articles()
 
 
 class HTMLParser:
@@ -346,14 +297,14 @@ class HTMLParser:
         Args:
             article_soup (bs4.BeautifulSoup): BeautifulSoup instance
         """
-        text = article_soup.find_all(itemprop="articleBody")
         description = article_soup.find(itemprop="description")
         article = []
         if description:
-            article.append(description.text)
-        for paragraph in text:
-            article.append(paragraph.text)
-        self.article.text = ''.join(article)
+            article.append(description.text.rstrip())
+        for div in article_soup.find_all('div', {'class': 'article__body'}):
+            for paragraph in div.select('p'):
+                article.append(paragraph.text)
+        self.article.text = '\n'.join(article)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
@@ -433,26 +384,11 @@ def main() -> None:
 
     for article_id, url in enumerate(crawler.urls, 1):
         parser = HTMLParser(url, article_id, config)
-        article = parser.parse
-        if isinstance(article, Article):
-            to_raw(article)
-            to_meta(article)
-
-
-def recursive_main() -> None:
-    config = Config(CRAWLER_CONFIG_PATH)
-    prepare_environment(ASSETS_PATH)
-    crawler = CrawlerRecursive(config)
-    crawler.find_articles()
-
-    for article_id, url in enumerate(crawler.urls, 1):
-        parser = HTMLParser(url, article_id, config)
-        article = parser.parse
+        article = parser.parse()
         if isinstance(article, Article):
             to_raw(article)
             to_meta(article)
 
 
 if __name__ == "__main__":
-    #main()
-    recursive_main()
+    main()
