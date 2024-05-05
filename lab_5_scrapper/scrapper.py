@@ -106,16 +106,19 @@ class Config:
 
         for seed_url in self.config.seed_urls:
             if not re.match(r"https?://(www.)mk\.ru/science/technology/", seed_url):
-                raise IncorrectSeedURLError("Seed URL does not match pattern 'https://www.mk.ru/science/technology/'")
+                raise (IncorrectSeedURLError
+                       ("Seed URL does not match pattern 'https://www.mk.ru/science/technology/'"))
 
         if not isinstance(self.config.total_articles, int) or self.config.total_articles <= 0:
-            raise IncorrectNumberOfArticlesError("Total number of articles to parse is not an integer")
+            raise (IncorrectNumberOfArticlesError
+                   ("Total number of articles to parse is not an integer"))
 
         if not 0 < self.config.total_articles < 150:
-            raise NumberOfArticlesOutOfRangeError("Total number of articles is out of range from 1 to 150")
+            raise (NumberOfArticlesOutOfRangeError
+                   ("Total number of articles is out of range from 1 to 150"))
 
         if not isinstance(self.config.headers, dict):
-            raise IncorrectHeadersError("Headers are not in the form of a dictionary")
+            raise (IncorrectHeadersError("Headers are not in the form of a dictionary"))
 
         if not isinstance(self.config.encoding, str):
             raise IncorrectEncodingError("Encoding must be specified as a string")
@@ -237,7 +240,10 @@ class Crawler:
         Returns:
             str: Url from HTML
         """
-        return str(article_bs.get('href'))
+        url = article_bs.get('href')
+        if url:
+            return url
+        return ''
 
     def find_articles(self) -> None:
         """
@@ -245,7 +251,6 @@ class Crawler:
         """
         for url in self.get_search_urls():
             response = make_request(url, self.config)
-
             if not response.ok:
                 continue
 
@@ -255,7 +260,7 @@ class Crawler:
                     break
 
                 url = self._extract_url(article_url)
-                if url and url not in self.urls:
+                if url != '' and url not in self.urls:
                     self.urls.append(url)
 
     def get_search_urls(self) -> list:
@@ -300,11 +305,18 @@ class HTMLParser:
         """
         description = article_soup.find(itemprop="description")
         article = []
+        subtitle = article_soup.find('p', class_='article__subtitle')
+        if subtitle:
+            article.append(subtitle.text)
         if description:
-            article.append(description.text.rstrip())
+            article.append(description.text.strip())
         for div in article_soup.find_all('div', {'class': 'article__body'}):
             for paragraph in div.select('p'):
-                article.append(paragraph.text)
+                paragraph_text = paragraph.text
+                if '\n' in paragraph_text:
+                    paragraph_text = paragraph_text.replace('\n', '')
+                if paragraph_text != '':
+                    article.append(paragraph_text.strip())
         self.article.text = '\n'.join(article)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
