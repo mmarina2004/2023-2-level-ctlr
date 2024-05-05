@@ -118,7 +118,7 @@ class Config:
                    ("Total number of articles is out of range from 1 to 150"))
 
         if not isinstance(self.config.headers, dict):
-            raise (IncorrectHeadersError("Headers are not in the form of a dictionary"))
+            raise IncorrectHeadersError("Headers are not in the form of a dictionary")
 
         if not isinstance(self.config.encoding, str):
             raise IncorrectEncodingError("Encoding must be specified as a string")
@@ -242,7 +242,7 @@ class Crawler:
         """
         url = article_bs.get('href')
         if url:
-            return url
+            return str(url)
         return ''
 
     def find_articles(self) -> None:
