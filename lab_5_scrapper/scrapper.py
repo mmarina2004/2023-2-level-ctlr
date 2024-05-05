@@ -107,7 +107,7 @@ class Config:
         for seed_url in self.config.seed_urls:
             if not re.match(r"https?://(www.)mk\.ru/science/technology/", seed_url):
                 raise (IncorrectSeedURLError
-                       ("Seed URL does not match pattern 'https://www.mk.ru/science/technology/'"))
+                    ("Seed URL does not match pattern 'https://www.mk.ru/science/technology/'"))
 
         if not isinstance(self.config.total_articles, int) or self.config.total_articles <= 0:
             raise (IncorrectNumberOfArticlesError
