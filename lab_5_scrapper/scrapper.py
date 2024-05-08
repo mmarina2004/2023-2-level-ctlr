@@ -241,9 +241,7 @@ class Crawler:
             str: Url from HTML
         """
         url = article_bs.get('href')
-        if url:
-            return str(url)
-        return ''
+        return str(url) if url else ''
 
     def find_articles(self) -> None:
         """
@@ -338,9 +336,8 @@ class HTMLParser:
 
         date = article_soup.find('time', class_='meta__text')
         if date:
-            article_date = date.text
-            formatted_date = article_date.replace(' в ', '')
-            self.article.date = self.unify_date_format(formatted_date)
+            datetime_value = date.get('datetime')
+            self.article.date = self.unify_date_format(datetime_value)
 
         tags = article_soup.find_all('a', class_='article__tag-item')
         for tag in tags:
@@ -356,7 +353,7 @@ class HTMLParser:
         Returns:
             datetime.datetime: Datetime object
         """
-        return datetime.datetime.strptime(date_str, "%d.%m.%Y %H:%M")
+        return datetime.datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S%z')
 
     def parse(self) -> Union[Article, bool, list]:
         """
