@@ -74,11 +74,11 @@ class CorpusManager:
 
         raw_f = list(self.path_to_raw_txt_data.glob("*_raw.txt"))
         meta_f = list(self.path_to_raw_txt_data.glob("*_meta.json"))
-        if len(meta_f) != len(raw_f):
+        if len(raw_f) != len(meta_f):
             raise InconsistentDatasetError
 
-        sorted_raw_files = sorted(raw_f)
-        sorted_meta_files = sorted(meta_f)
+        sorted_raw_files = sorted(raw_f, key=lambda file: get_article_id_from_filepath(file))
+        sorted_meta_files = sorted(meta_f, key=lambda file: get_article_id_from_filepath(file))
 
         for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files)):
             if ind + 1 != get_article_id_from_filepath(raw) \
@@ -234,7 +234,7 @@ class StanzaAnalyzer(LibraryWrapper):
         Returns:
             list[StanzaDocument]: List of documents
         """
-        return [self._analyzer.process([Document([], text=text)]) for text in texts]
+        return self._analyzer.process([Document([], text=' '.join(split_by_sentence(text))) for text in texts])
 
     def to_conllu(self, article: Article) -> None:
         """
@@ -244,7 +244,7 @@ class StanzaAnalyzer(LibraryWrapper):
             article (Article): Article containing information to save
         """
         CoNLL.write_doc2conll(
-            doc=article.get_conllu_info()[0],
+            doc=article.get_conllu_info(),
             filename=article.get_file_path(kind=ArtifactType.STANZA_CONLLU),
         )
 
