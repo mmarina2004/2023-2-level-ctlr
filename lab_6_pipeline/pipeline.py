@@ -3,13 +3,14 @@ Pipeline for CONLL-U formatting.
 """
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks
 import pathlib
+
 import spacy_udpipe
 import stanza
-
 from networkx.classes.digraph import DiGraph
 from stanza.models.common.doc import Document
 from stanza.pipeline.core import Pipeline
 from stanza.utils.conll import CoNLL
+
 from core_utils.article.article import (Article, ArtifactType, get_article_id_from_filepath,
                                         split_by_sentence)
 from core_utils.article.io import from_meta, from_raw, to_cleaned, to_meta
@@ -72,8 +73,8 @@ class CorpusManager:
         if len(raw_f) != len(meta_f):
             raise InconsistentDatasetError
 
-        sorted_raw_files = sorted(raw_f, key=lambda file: get_article_id_from_filepath(file))
-        sorted_meta_files = sorted(meta_f, key=lambda file: get_article_id_from_filepath(file))
+        sorted_raw_files = sorted(raw_f)
+        sorted_meta_files = sorted(meta_f)
 
         for ind, (raw_f, meta_f) in enumerate(zip(sorted_raw_files, sorted_meta_files)):
             if ind + 1 != get_article_id_from_filepath(raw_f) \
