@@ -73,13 +73,13 @@ class CorpusManager:
         if len(raw_f) != len(meta_f):
             raise InconsistentDatasetError
 
-        sorted_raw_files = sorted(raw_f)
-        sorted_meta_files = sorted(meta_f)
+        sorted_raw_files = sorted(raw_f, key=lambda file: get_article_id_from_filepath(file))
+        sorted_meta_files = sorted(meta_f, key=lambda file: get_article_id_from_filepath(file))
 
-        for ind, (raw_f, meta_f) in enumerate(zip(sorted_raw_files, sorted_meta_files)):
-            if ind + 1 != get_article_id_from_filepath(raw_f) \
-                    or ind + 1 != get_article_id_from_filepath(meta_f)\
-                    or raw_f.stat().st_size == 0 or meta_f.stat().st_size == 0:
+        for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files)):
+            if ind + 1 != get_article_id_from_filepath(raw) \
+                    or ind + 1 != get_article_id_from_filepath(meta)\
+                    or raw.stat().st_size == 0 or meta.stat().st_size == 0:
                 raise InconsistentDatasetError
 
 
