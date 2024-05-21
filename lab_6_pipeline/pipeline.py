@@ -73,8 +73,8 @@ class CorpusManager:
         if len(raw_f) != len(meta_f):
             raise InconsistentDatasetError
 
-        sorted_raw_files = sorted(raw_f, key=lambda file: get_article_id_from_filepath(file))
-        sorted_meta_files = sorted(meta_f, key=lambda file: get_article_id_from_filepath(file))
+        sorted_raw_files = sorted(raw_f, key=get_article_id_from_filepath)
+        sorted_meta_files = sorted(meta_f, key=get_article_id_from_filepath)
 
         for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files)):
             if ind + 1 != get_article_id_from_filepath(raw) \
