@@ -11,8 +11,7 @@ from stanza.models.common.doc import Document
 from stanza.pipeline.core import Pipeline
 from stanza.utils.conll import CoNLL
 
-from core_utils.article.article import (Article, ArtifactType, get_article_id_from_filepath,
-                                        split_by_sentence)
+from core_utils.article.article import (Article, ArtifactType, get_article_id_from_filepath)
 from core_utils.article.io import from_meta, from_raw, to_cleaned, to_meta
 from core_utils.constants import ASSETS_PATH, UDPIPE_MODEL_PATH
 from core_utils.pipeline import (AbstractCoNLLUAnalyzer, CoNLLUDocument, LibraryWrapper,
@@ -76,12 +75,11 @@ class CorpusManager:
         sorted_raw_files = sorted(raw_f, key=get_article_id_from_filepath)
         sorted_meta_files = sorted(meta_f, key=get_article_id_from_filepath)
 
-        for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files)):
-            if ind + 1 != get_article_id_from_filepath(raw) \
-                    or ind + 1 != get_article_id_from_filepath(meta)\
-                    or raw.stat().st_size == 0 or meta.stat().st_size == 0:
+        for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files), start=1):
+            if ind != get_article_id_from_filepath(raw) \
+                    or ind != get_article_id_from_filepath(meta)\
+                    or not raw.read_text() or not meta.read_text():
                 raise InconsistentDatasetError
-
 
     def _scan_dataset(self) -> None:
         """
@@ -173,7 +171,7 @@ class UDPipeAnalyzer(LibraryWrapper):
         Returns:
             list[StanzaDocument | str]: List of documents
         """
-        return [self._analyzer(' '.join(split_by_sentence(text)))._.conll_str for text in texts]
+        return [self._analyzer(text)._.conll_str for text in texts]
 
     def to_conllu(self, article: Article) -> None:
         """
@@ -229,8 +227,7 @@ class StanzaAnalyzer(LibraryWrapper):
         Returns:
             list[StanzaDocument]: List of documents
         """
-        return self._analyzer.process([Document([],
-                                       text=' '.join(split_by_sentence(text))) for text in texts])
+        return self._analyzer.process([Document([], text=text) for text in texts])
 
     def to_conllu(self, article: Article) -> None:
         """
@@ -278,14 +275,12 @@ class POSFrequencyPipeline:
         Visualize the frequencies of each part of speech.
         """
         for article_id, article in self._corpus.get_articles().items():
-            if article.get_file_path(kind=ArtifactType.STANZA_CONLLU) \
-                    .stat().st_size == 0:
+            if not article.get_file_path(kind=ArtifactType.STANZA_CONLLU).read_text():
                 raise EmptyFileError
 
             from_meta(article.get_meta_file_path(), article)
             article.set_pos_info(self._count_frequencies(article))
             to_meta(article)
-
             visualize(article=article,
                       path_to_save=self._corpus.path_to_raw_txt_data /
                       f'{article_id}_image.png')
@@ -326,9 +321,6 @@ class PatternSearchPipeline(PipelineProtocol):
             analyzer (LibraryWrapper): Analyzer instance
             pos (tuple[str, ...]): Root, Dependency, Child part of speech
         """
-        self._corpus = corpus_manager
-        self._analyzer = analyzer
-        self._node_labels = pos
 
     def _make_graphs(self, doc: CoNLLUDocument) -> list[DiGraph]:
         """
