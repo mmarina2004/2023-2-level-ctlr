@@ -85,9 +85,11 @@ class CorpusManager:
         """
         Register each dataset entry.
         """
-        self._storage = {get_article_id_from_filepath(file_name):
-                         from_raw(file_name, Article(None, get_article_id_from_filepath(file_name)))
-                         for file_name in self.path_to_raw_txt_data.glob("*_raw.txt")}
+        self._storage = {
+            get_article_id_from_filepath(file_name):
+            from_raw(file_name, Article(None, get_article_id_from_filepath(file_name)))
+            for file_name in self.path_to_raw_txt_data.glob("*_raw.txt")
+        }
 
     def get_articles(self) -> dict:
         """
@@ -298,10 +300,9 @@ class POSFrequencyPipeline:
         pos_frequencies = {}
         for conllu_sentence in self._analyzer.from_conllu(article).sentences:
             for word in conllu_sentence.words:
-                word_feature = word.to_dict()["upos"]
-                if word_feature not in pos_frequencies:
-                    pos_frequencies[word_feature] = 0
-                pos_frequencies[word_feature] += 1
+                word_feature = word.to_dict().get('upos')
+                if word_feature:
+                    pos_frequencies[word_feature] = pos_frequencies.get(word_feature, 0) + 1
         return pos_frequencies
 
 
