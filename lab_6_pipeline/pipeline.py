@@ -6,6 +6,7 @@ import pathlib
 
 import spacy_udpipe
 import stanza
+from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.classes.digraph import DiGraph
 from stanza.models.common.doc import Document
 from stanza.pipeline.core import Pipeline
@@ -77,7 +78,7 @@ class CorpusManager:
 
         for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files), start=1):
             if ind != get_article_id_from_filepath(raw) \
-                    or ind != get_article_id_from_filepath(meta)\
+                    or ind != get_article_id_from_filepath(meta) \
                     or not raw.read_text() or not meta.read_text():
                 raise InconsistentDatasetError
 
@@ -322,6 +323,9 @@ class PatternSearchPipeline(PipelineProtocol):
             analyzer (LibraryWrapper): Analyzer instance
             pos (tuple[str, ...]): Root, Dependency, Child part of speech
         """
+        self._corpus = corpus_manager
+        self._analyzer = analyzer
+        self._node_labels = pos
 
     def _make_graphs(self, doc: CoNLLUDocument) -> list[DiGraph]:
         """
@@ -333,6 +337,15 @@ class PatternSearchPipeline(PipelineProtocol):
         Returns:
             list[DiGraph]: Graphs for the sentences in the document
         """
+        graphs = []
+        for conllu_sentence in doc.sentences:
+            digraph = DiGraph()
+            for word in conllu_sentence.words:
+                word = word.to_dict()
+                digraph.add_node(word['id'], label=word['upos'], text=word['text'])
+                digraph.add_edge(word['head'], word['id'], label=word["deprel"])
+            graphs.append(digraph)
+        return graphs
 
     def _add_children(
         self, graph: DiGraph, subgraph_to_graph: dict, node_id: int, tree_node: TreeNode
@@ -357,6 +370,26 @@ class PatternSearchPipeline(PipelineProtocol):
         Returns:
             dict[int, list[TreeNode]]: A dictionary with pattern matches
         """
+        found_patterns = {}
+        for (sentence_id, graph) in enumerate(doc_graphs):
+            d = {}
+            ideal_graph = DiGraph()
+            for i in range(len(list(graph.nodes)) - 1):
+                if graph.nodes[i + 1]['label'] in self._node_labels:
+                    d.update({i + 1: graph.nodes[i + 1]})
+                    ideal_graph.add_node(i + 1, label=graph.nodes[i + 1].get('label'))
+
+            edges = graph.edges()
+
+            for edge in edges:
+                if edge[0] in d.keys() and edge[1] in d.keys():
+                    ideal_graph.add_edge(edge[0], edge[1])
+
+            matcher = GraphMatcher(graph, ideal_graph,
+                                   node_match=lambda n1, n2:
+                                   n1.get('label', '') == n2.get('label'))
+
+        return found_patterns
 
     def run(self) -> None:
         """
@@ -381,6 +414,9 @@ def main() -> None:
     visualizer = POSFrequencyPipeline(corpus_manager, stanza_analyzer)
     visualizer.run()
 
+    visualizer_patterns = PatternSearchPipeline(corpus_manager, stanza_analyzer,
+                                                ("VERB", "NOUN", "ADP"))
+    visualizer_patterns.run()
 
 
 if __name__ == "__main__":
