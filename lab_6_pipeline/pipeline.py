@@ -3,7 +3,6 @@ Pipeline for CONLL-U formatting.
 """
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks
 import pathlib
-
 from dataclasses import asdict
 
 import spacy_udpipe
@@ -328,6 +327,7 @@ class PatternSearchPipeline(PipelineProtocol):
         self._corpus = corpus_manager
         self._analyzer = analyzer
         self._node_labels = pos
+        self.ideal_graph = DiGraph()
 
     def _make_graphs(self, doc: CoNLLUDocument) -> list[DiGraph]:
         """
@@ -392,37 +392,35 @@ class PatternSearchPipeline(PipelineProtocol):
         found_patterns = {}
         for sent_id, graph in enumerate(doc_graphs):
             target_features = {}
-            ideal_graph = DiGraph()
             for i in range(1, len(list(graph.nodes))):
                 if graph.nodes[i]['label'] in self._node_labels:
                     target_features.update({i: graph.nodes[i]})
-                    ideal_graph.add_node(i, label=graph.nodes[i].get('label'))
+                    self.ideal_graph.add_node(i, label=graph.nodes[i].get('label'))
 
             for edge in graph.edges():
                 if edge[0] in target_features and edge[1] in target_features:
-                    ideal_graph.add_edge(edge[0], edge[1])
+                    self.ideal_graph.add_edge(edge[0], edge[1])
 
-            matcher = GraphMatcher(graph, ideal_graph,
+            matcher = GraphMatcher(graph, self.ideal_graph,
                                    node_match=lambda n1, n2:
                                    n1.get('label', '') == n2.get('label'))
 
             patterns = []
             added_base_nodes = []
             for isograph in matcher.subgraph_isomorphisms_iter():
-                subgraph_to_graph = graph.subgraph(isograph.keys())
                 base_nodes = [node for node in graph.subgraph(isograph.keys()).nodes
-                              if not tuple(subgraph_to_graph.predecessors(node))]
+                              if not tuple(graph.subgraph(isograph.keys()).predecessors(node))]
 
                 if base_nodes not in added_base_nodes:
                     added_base_nodes.append(base_nodes)
 
                     for node in base_nodes:
-                        if len(graph.out_edges(node)) >= 3:
+                        if len(graph.out_edges(node)) >= 2:
                             tree_node = TreeNode(graph.nodes[node].get('label'),
                                                  graph.nodes[node].get('text'),
                                                  [])
                             self._add_children(graph,
-                                               to_dict_of_lists(subgraph_to_graph),
+                                               to_dict_of_lists(graph.subgraph(isograph.keys())),
                                                node,
                                                tree_node)
                             patterns.append(tree_node)
