@@ -327,7 +327,6 @@ class PatternSearchPipeline(PipelineProtocol):
         self._corpus = corpus_manager
         self._analyzer = analyzer
         self._node_labels = pos
-        self.ideal_graph = DiGraph()
 
     def _make_graphs(self, doc: CoNLLUDocument) -> list[DiGraph]:
         """
@@ -391,17 +390,17 @@ class PatternSearchPipeline(PipelineProtocol):
         """
         found_patterns = {}
         for sent_id, graph in enumerate(doc_graphs):
-            target_features = {}
+            ideal_graph = DiGraph()
+
             for i in range(1, len(list(graph.nodes))):
-                if graph.nodes[i]['label'] in self._node_labels:
-                    target_features.update({i: graph.nodes[i]})
-                    self.ideal_graph.add_node(i, label=graph.nodes[i].get('label'))
+                if graph.nodes[i].get('label') in self._node_labels:
+                    ideal_graph.add_node(i, label=graph.nodes[i].get('label'))
 
             for edge in graph.edges():
-                if edge[0] in target_features and edge[1] in target_features:
-                    self.ideal_graph.add_edge(edge[0], edge[1])
+                if edge[0] in ideal_graph.nodes and edge[1] in ideal_graph.nodes:
+                    ideal_graph.add_edge(edge[0], edge[1])
 
-            matcher = GraphMatcher(graph, self.ideal_graph,
+            matcher = GraphMatcher(graph, ideal_graph,
                                    node_match=lambda n1, n2:
                                    n1.get('label', '') == n2.get('label'))
 
@@ -426,7 +425,7 @@ class PatternSearchPipeline(PipelineProtocol):
                             patterns.append(tree_node)
 
             if patterns:
-                found_patterns[sent_id] = patterns
+                found_patterns.update({sent_id: patterns})
 
         return found_patterns
 
