@@ -6,7 +6,9 @@ import pathlib
 
 import spacy_udpipe
 import stanza
+from dataclasses import asdict
 from networkx.algorithms.isomorphism import GraphMatcher
+from networkx import to_dict_of_lists
 from networkx.classes.digraph import DiGraph
 from stanza.models.common.doc import Document
 from stanza.pipeline.core import Pipeline
@@ -76,10 +78,10 @@ class CorpusManager:
         sorted_raw_files = sorted(raw_f, key=get_article_id_from_filepath)
         sorted_meta_files = sorted(meta_f, key=get_article_id_from_filepath)
 
-        for ind, (raw, meta) in enumerate(zip(sorted_raw_files, sorted_meta_files), start=1):
-            if ind != get_article_id_from_filepath(raw) \
-                    or ind != get_article_id_from_filepath(meta) \
-                    or not raw.read_text() or not meta.read_text():
+        for index, (meta, raw) in enumerate(zip(sorted_meta_files, sorted_raw_files), 1):
+            if index != get_article_id_from_filepath(meta) \
+                    or index != get_article_id_from_filepath(raw) \
+                    or not meta.stat().st_size or not raw.stat().st_size:
                 raise InconsistentDatasetError
 
     def _scan_dataset(self) -> None:
@@ -278,7 +280,7 @@ class POSFrequencyPipeline:
         Visualize the frequencies of each part of speech.
         """
         for article_id, article in self._corpus.get_articles().items():
-            if not article.get_file_path(kind=ArtifactType.STANZA_CONLLU).read_text():
+            if not article.get_file_path(kind=ArtifactType.STANZA_CONLLU).stat().st_size:
                 raise EmptyFileError
 
             from_meta(article.get_meta_file_path(), article)
@@ -302,8 +304,7 @@ class POSFrequencyPipeline:
         for conllu_sentence in self._analyzer.from_conllu(article).sentences:
             for word in conllu_sentence.words:
                 word_feature = word.to_dict().get('upos')
-                if word_feature:
-                    pos_frequencies[word_feature] = pos_frequencies.get(word_feature, 0) + 1
+                pos_frequencies[word_feature] = pos_frequencies.get(word_feature, 0) + 1
         return pos_frequencies
 
 
@@ -359,6 +360,23 @@ class PatternSearchPipeline(PipelineProtocol):
             node_id (int): ID of root node of the match
             tree_node (TreeNode): Root node of the match
         """
+        children = tuple(graph.neighbors(node_id))
+        if not children or tree_node.children or node_id not in subgraph_to_graph.keys():
+            return
+
+        for child_id in children:
+            if child_id not in [i[0] for i in subgraph_to_graph.values() if i]:
+                continue
+
+            child_node_info = dict(graph.nodes)[child_id]
+            child_node = TreeNode(
+                child_node_info.get('label'),
+                child_node_info.get('text'),
+                []
+            )
+            tree_node.children.append(child_node)
+            self._add_children(graph, subgraph_to_graph, child_id, child_node)
+        return
 
     def _find_pattern(self, doc_graphs: list) -> dict[int, list[TreeNode]]:
         """
@@ -371,7 +389,7 @@ class PatternSearchPipeline(PipelineProtocol):
             dict[int, list[TreeNode]]: A dictionary with pattern matches
         """
         found_patterns = {}
-        for (sentence_id, graph) in enumerate(doc_graphs):
+        for id, graph in enumerate(doc_graphs):
             d = {}
             ideal_graph = DiGraph()
             for i in range(len(list(graph.nodes)) - 1):
@@ -389,12 +407,40 @@ class PatternSearchPipeline(PipelineProtocol):
                                    node_match=lambda n1, n2:
                                    n1.get('label', '') == n2.get('label'))
 
+            patterns = []
+            added_base_nodes = []
+            for isograph in matcher.subgraph_isomorphisms_iter():
+                subgraph_to_graph = graph.subgraph(isograph.keys())
+                base_nodes = [node for node in subgraph_to_graph.nodes
+                              if not tuple(subgraph_to_graph.predecessors(node))]
+
+                if base_nodes not in added_base_nodes:
+                    added_base_nodes.append(base_nodes)
+
+                    for node in base_nodes:
+                        if len(graph.out_edges(node)) >= 3:
+                            tree_node = TreeNode(graph.nodes[node].get('label'),
+                                                 graph.nodes[node].get('text'),
+                                                 [])
+                            self._add_children(graph, to_dict_of_lists(subgraph_to_graph), node, tree_node)
+                            patterns.append(tree_node)
+
+            if patterns:
+                found_patterns[id] = patterns
+
         return found_patterns
 
     def run(self) -> None:
         """
         Search for a pattern in documents and writes found information to JSON file.
         """
+        for article in self._corpus.get_articles().values():
+            pattern_matches = self._find_pattern(self._make_graphs(self._analyzer.from_conllu(article)))
+            article.set_patterns_info({
+                id: [asdict(pattern) for pattern in patterns]
+                for id, patterns in pattern_matches.items()
+            })
+            to_meta(article)
 
 
 def main() -> None:
