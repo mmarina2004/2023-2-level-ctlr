@@ -4,11 +4,12 @@ Pipeline for CONLL-U formatting.
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks
 import pathlib
 
+from dataclasses import asdict
+
 import spacy_udpipe
 import stanza
-from dataclasses import asdict
-from networkx.algorithms.isomorphism import GraphMatcher
 from networkx import to_dict_of_lists
+from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.classes.digraph import DiGraph
 from stanza.models.common.doc import Document
 from stanza.pipeline.core import Pipeline
@@ -389,18 +390,16 @@ class PatternSearchPipeline(PipelineProtocol):
             dict[int, list[TreeNode]]: A dictionary with pattern matches
         """
         found_patterns = {}
-        for id, graph in enumerate(doc_graphs):
-            d = {}
+        for sent_id, graph in enumerate(doc_graphs):
+            target_features = {}
             ideal_graph = DiGraph()
-            for i in range(len(list(graph.nodes)) - 1):
-                if graph.nodes[i + 1]['label'] in self._node_labels:
-                    d.update({i + 1: graph.nodes[i + 1]})
-                    ideal_graph.add_node(i + 1, label=graph.nodes[i + 1].get('label'))
+            for i in range(1, len(list(graph.nodes))):
+                if graph.nodes[i]['label'] in self._node_labels:
+                    target_features.update({i: graph.nodes[i]})
+                    ideal_graph.add_node(i, label=graph.nodes[i].get('label'))
 
-            edges = graph.edges()
-
-            for edge in edges:
-                if edge[0] in d.keys() and edge[1] in d.keys():
+            for edge in graph.edges():
+                if edge[0] in target_features and edge[1] in target_features:
                     ideal_graph.add_edge(edge[0], edge[1])
 
             matcher = GraphMatcher(graph, ideal_graph,
@@ -411,7 +410,7 @@ class PatternSearchPipeline(PipelineProtocol):
             added_base_nodes = []
             for isograph in matcher.subgraph_isomorphisms_iter():
                 subgraph_to_graph = graph.subgraph(isograph.keys())
-                base_nodes = [node for node in subgraph_to_graph.nodes
+                base_nodes = [node for node in graph.subgraph(isograph.keys()).nodes
                               if not tuple(subgraph_to_graph.predecessors(node))]
 
                 if base_nodes not in added_base_nodes:
@@ -422,11 +421,14 @@ class PatternSearchPipeline(PipelineProtocol):
                             tree_node = TreeNode(graph.nodes[node].get('label'),
                                                  graph.nodes[node].get('text'),
                                                  [])
-                            self._add_children(graph, to_dict_of_lists(subgraph_to_graph), node, tree_node)
+                            self._add_children(graph,
+                                               to_dict_of_lists(subgraph_to_graph),
+                                               node,
+                                               tree_node)
                             patterns.append(tree_node)
 
             if patterns:
-                found_patterns[id] = patterns
+                found_patterns[sent_id] = patterns
 
         return found_patterns
 
@@ -435,10 +437,11 @@ class PatternSearchPipeline(PipelineProtocol):
         Search for a pattern in documents and writes found information to JSON file.
         """
         for article in self._corpus.get_articles().values():
-            pattern_matches = self._find_pattern(self._make_graphs(self._analyzer.from_conllu(article)))
+            pattern_matches = self._find_pattern(self._make_graphs
+                                                 (self._analyzer.from_conllu(article)))
             article.set_patterns_info({
-                id: [asdict(pattern) for pattern in patterns]
-                for id, patterns in pattern_matches.items()
+                sent_id: [asdict(pattern) for pattern in patterns]
+                for sent_id, patterns in pattern_matches.items()
             })
             to_meta(article)
 
